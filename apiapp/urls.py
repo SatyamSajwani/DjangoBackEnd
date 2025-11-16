@@ -4,6 +4,7 @@ from django.urls import include, path
 from django.conf.urls.static import static
 from apiapp.views import *
 from rest_framework import routers
+from rest_framework_nested import routers 
 
 # Initialize the DRF router
 router = routers.DefaultRouter()
@@ -30,8 +31,9 @@ router.register(r'distributors', CreatedistributorViewSet, basename='distributor
 
 # 👥 Subusers under each distributor
 # Nested route — shows or creates subusers for a specific distributor
-# Example: /api/v1/distributors/2/subusers/
-router.register(r'distributors/(?P<distributor_pk>[^/.]+)/subusers', DistributorSubUserViewSet, basename='distributor-subusers')
+# Example: /api/v1/distributors/1/subusers/
+subuser_router = routers.NestedSimpleRouter(router, r'distributors', lookup='distributor')
+subuser_router.register(r'subusers', DistributorSubUserViewSet, basename='distributor-subusers')
 
 
 # 📜 Custom URLs (not part of router)
@@ -40,7 +42,7 @@ urlpatterns = [
     # Step 1: Distributor enters email or mobile → system sends OTP
     # Method: POST
     # Example: /api/v1/distributor/request-otp/
-    path('distributor/request-otp/', DistributorSendOTPView.as_view(), name='distributor_request_otp'),
+    path('distributor/send-otp/', DistributorSendOTPView.as_view(), name='distributor_request_otp'),
 
     # ✅ Verify OTP and Login
     # Step 2: Distributor enters OTP → system verifies and returns JWT tokens
@@ -62,4 +64,5 @@ urlpatterns = [
 
     # 🧭 Include all router-based endpoints (products, brands, etc.)
     path('', include(router.urls)),
+    path('', include(subuser_router.urls)),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

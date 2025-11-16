@@ -15,22 +15,21 @@ class DistributorSerializer(serializers.ModelSerializer):
         model=CreateDistributor
         fields= '__all__'
 
-class SubuserSerializer(serializers.HyperlinkedModelSerializer):
+class SubuserSerializer(serializers.ModelSerializer):
     distributor=serializers.PrimaryKeyRelatedField(queryset=CreateDistributor.objects.all(),)
-    
-    distributor_id = serializers.PrimaryKeyRelatedField(source='distributor', read_only=True)
-    subuser_id=serializers.ReadOnlyField()
+    # subuser_id=serializers.ReadOnlyField()
     class Meta:
         model = CreateSubUser
         fields = '__all__'
         extra_kwargs = {'password': {'write_only': True}}
 
     def create(self, validated_data):
-        raw_password = validated_data.pop('password')
-        sub = CreateSubUser(**validated_data)
-        sub.set_password(raw_password)
-        sub.save()
-        return sub
+        password = validated_data.pop('password', None)
+        subuser = CreateSubUser(**validated_data)
+        if password:
+            subuser.set_password(password)
+        subuser.save()
+        return subuser
 
     def update(self, instance, validated_data):
         # if password present, hash it

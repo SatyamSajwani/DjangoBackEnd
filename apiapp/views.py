@@ -2,6 +2,7 @@
 from datetime import timedelta
 from django.forms import ValidationError
 from django.shortcuts import get_object_or_404
+import requests
 from rest_framework import viewsets, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -14,6 +15,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.core.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from django.core.mail import EmailMessage
 # ===============================
 # JWT Token Helpers
 # ===============================
@@ -51,53 +53,37 @@ class CreatedistributorViewSet(viewsets.ModelViewSet):
     queryset = CreateDistributor.objects.all()
     serializer_class = DistributorSerializer
 
-    # GET: createDistributor/{id}/subusers/
-    @action(detail=True, methods=['get'])
+    # Nested route: /api/v1/distributors/<pk>/subusers/
+    @action(detail=True, methods=['get', 'post'])
     def subusers(self, request, pk=None):
-        distributor = CreateDistributor.objects.get(pk=pk)
-        subusers = CreateSubUser.objects.filter(Distributor_Name=distributor)
-        subuser_serializer = SubuserSerializer(subusers, many=True, context={'request': request})
-        return Response(subuser_serializer.data)
-    
-    # Override create method to add custom behavior for assigning distributor automatically using mobile number
-    def create(self, request, *args, **kwargs):
-        distributor_mobile = request.data.get("distributor_mobile")
-        if not distributor_mobile:
-            return Response({"error": "distributor_mobile is required"}, status=status.HTTP_400_BAD_REQUEST)
+        distributor = self.get_object()
 
-        try:
-            distributor = CreateDistributor.objects.get(mobileNo=distributor_mobile)
-        except CreateDistributor.DoesNotExist:
-            return Response({"error": "Distributor not found"}, status=status.HTTP_404_NOT_FOUND)
+        if request.method == 'GET':
+            subusers = CreateSubUser.objects.filter(distributor=distributor)
+            serializer = SubuserSerializer(subusers, many=True, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_200_OK)
 
-        serializer = self.get_serializer(data=request.data)
+        # POST => Create new subuser for this distributor
+        serializer = SubuserSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
-        serializer.save(distributor=distributor)  # 👈 Assign distributor automatically
-
+        serializer.save(distributor=distributor)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-
 # ===============================
 # SubUser ViewSet
 # ===============================
+
+
 class DistributorSubUserViewSet(viewsets.ModelViewSet):
     serializer_class = SubuserSerializer
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        token = self.request.auth
-        if not token or token.get("user_type") != "distributor":
-            return CreateSubUser.objects.none()
-        distributor_id = token["user_id"]
-        return CreateSubUser.objects.filter(distributor__Company_id=distributor_id, is_active=True)
+        distributor_pk = self.kwargs.get('distributor_pk')
+        return CreateSubUser.objects.filter(distributor_id=distributor_pk)
 
     def perform_create(self, serializer):
-        token = getattr(self.request, 'auth', None) or {}
-        if token.get('user_type') != 'distributor':
-            raise PermissionError("Not authorized")
-        distributor = get_object_or_404(CreateDistributor, Company_id=token["user_id"])
-        serializer.save(distributor=distributor)  # serializer.create will handle password hashing
+        distributor_pk = self.kwargs.get('distributor_pk')
+        distributor = get_object_or_404(CreateDistributor, pk=distributor_pk)
+        serializer.save(distributor=distributor)
 
 # ===============================
 # TyrePattern ViewSet
@@ -167,13 +153,9 @@ class CreateTyreModelViewSet(viewsets.ModelViewSet):
 #   "email": "distributor@example.com"
 # }
 
-OTP_VALIDITY_MINUTES = 10
-MAX_LOGIN_ATTEMPTS = 5
-OTP_RESEND_INTERVAL_SECONDS = 30
-class DistributorSendOTPView(APIView):
-        
+class DistributorSendOTPView(APIView):        
     def post(self, request):
-        email = request.data.get("email")
+        email = str(request.data.get("email")).strip()
 
         if not email:
             return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -181,50 +163,56 @@ class DistributorSendOTPView(APIView):
         try:
             distributor = CreateDistributor.objects.get(email=email)
         except CreateDistributor.DoesNotExist:
-            return Response({"error": "Distributor not found,Please Contect Admin Team"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Distributor not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        otp=str(random.randint(100000, 999999))
+        # Generate OTP
+        otp = str(random.randint(100000, 999999))
+
+        # Save OTP
         distributor.otp = otp
         distributor.otp_created_at = timezone.now()
         distributor.save()
-        try:
-            send_otp_email(distributor.email,otp, shop_name=distributor.Shop_name)
-            print(f"📱📱📱📱OTP for {distributor.Shop_name}: {otp} (to {email})")
-            
-        except Exception as e:
-            return Response({"error": f"Failed to send OTP: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        return Response({"message": "OTP sent successfully"}, status=status.HTTP_200_OK)
-           
-# ===============================
-# Distributor Verify OTP
-# ===============================
 
-# {
-#   "email": "example@gmail.com",
-#   "otp": "123456"
-# }
+        # Send OTP Email
+        subject = "Your Login OTP"
+        message = f"Your OTP is: {otp}\n\nIt is valid for 5 minutes."
+        print("your otp was ",{otp})
+
+        email_msg = EmailMessage(
+            subject,
+            message,
+            to=[email]
+        )
+        email_msg.send()
+        
+
+        return Response({"message": "OTP sent to your email"}, status=status.HTTP_200_OK)        
+
 
 class DistributorVerifyOTPView(APIView):
     def post(self, request):
         email = request.data.get("email")
         otp = request.data.get("otp")
+
         if not email or not otp:
-            return Response({"error": "Email and OTP are required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "email and OTP are required"}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
             distributor = CreateDistributor.objects.get(email=email)
         except CreateDistributor.DoesNotExist:
-            return Response({"error": "Invalid Email or OTP"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Invalid email or OTP"}, status=status.HTTP_404_NOT_FOUND)
 
-        # check otp presence
-        if not distributor.otp or not distributor.otp_created_at:
-            return Response({"error": "No OTP has been sent. Request OTP first."}, status=status.HTTP_400_BAD_REQUEST)
+        # Check OTP match
+        if distributor.otp != otp:
+            return Response({"error": "Invalid OTP"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # # check OTP expiry
-        # if distributor.otp != str(otp) or timezone.now() - distributor.otp_created_at > timedelta(minutes=OTP_VALIDITY_MINUTES):
-        #     return Response({"error": "Invalid or expired OTP"}, status=status.HTTP_400_BAD_REQUEST)
+        # Check OTP expiry (5 min)
+        if timezone.now() > distributor.otp_created_at + timedelta(minutes=5):
+            return Response({"error": "OTP expired"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Create tokens and include distributor id
-        tokens = get_tokens_for_identity(distributor.Company_id, "distributor", distributor_id=distributor.Company_id)
+        # Generate JWT Token
+        tokens = get_tokens_for_identity(distributor.id, "distributor", distributor_id=distributor.id)
+
         return Response({
             "message": "Login successful",
             "Shop_name": distributor.Shop_name,
@@ -232,7 +220,6 @@ class DistributorVerifyOTPView(APIView):
             "tokens": tokens
         }, status=status.HTTP_200_OK)
         
-            
 # -------------------------------------------------------------------
 # 🔹 Distributor profile management (/me)
 # -------------------------------------------------------------------
@@ -249,17 +236,17 @@ class DistributorMeView(APIView):
         data=DistributorSerializer(distributor, context={'request': request}).data
         return Response(data)
     
-def patch(self, request):
-    token = request.auth
-    if not token or token.get('user_type') != 'distributor':
-        return Response({"error": "Sorry you are Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+    def patch(self, request):
+        token = request.auth
+        if not token or token.get('user_type') != 'distributor':
+            return Response({"error": "Sorry you are Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
 
-    distributor = get_object_or_404(CreateDistributor, Company_id=token['user_id'])
-    serializer = DistributorSerializer(distributor, data=request.data, partial=True, context={'request': request})
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        distributor = get_object_or_404(CreateDistributor, Company_id=token['user_id'])
+        serializer = DistributorSerializer(distributor, data=request.data, partial=True, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 # ===============================
