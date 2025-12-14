@@ -1,68 +1,106 @@
 from django.conf import settings
-from django.contrib import admin
-from django.urls import include, path
 from django.conf.urls.static import static
+from django.urls import include, path
+
+# Import ViewSets and Views
 from apiapp.views import *
-from rest_framework import routers
-from rest_framework_nested import routers 
 
-# Initialize the DRF router
-router = routers.DefaultRouter()
+# Correct router imports
+from rest_framework import routers as drf_routers           # DefaultRouter
+from rest_framework_nested import routers as nested_routers # NestedRouter
 
-# 🛞 Products (Tyre Models)
-# Handles all CRUD (GET, POST, PUT, DELETE) for tyre products
-# Example: /api/v1/products/
+
+# -------------------------------------------------------------------
+# 🔵 MAIN ROUTER (DEFAULT DRF ROUTER)
+# -------------------------------------------------------------------
+router = drf_routers.DefaultRouter()
+
+# 🛞 PRODUCTS (Tyre Models CRUD)
+# Endpoint:
+#   GET    /api/v1/products/
+#   POST   /api/v1/products/
+#   PUT    /api/v1/products/<id>/
+#   DELETE /api/v1/products/<id>/
 router.register(r'products', CreateTyreModelViewSet, basename='products')
 
-# 🧩 Tyre Patterns
-# Each tyre pattern belongs to a tyre model
-# Example: /api/v1/patterns/
+# 🧩 PATTERNS (Under Tyre Models)
+# Endpoint:
+#   GET  /api/v1/patterns/
 router.register(r'patterns', TyrePatternViewSet, basename='patterns')
 
-# 🏷️ Brands
-# Manage tyre brands (e.g., MRF, CEAT, Apollo)
-# Example: /api/v1/brands/
+# 🏷️ BRANDS
+# Endpoint:
+#   GET  /api/v1/brands/
+#   POST /api/v1/brands/
 router.register(r'brands', BrandViewSet, basename='brands')
 
-# 🧍‍♂️ Distributors
-# Main accounts that can log in using OTP
-# Example: /api/v1/distributors/
+# 🧍‍♂️ DISTRIBUTORS (Main Accounts)
+# Endpoint:
+#   GET  /api/v1/distributors/
+#   POST /api/v1/distributors/
 router.register(r'distributors', CreatedistributorViewSet, basename='distributors')
 
-# 👥 Subusers under each distributor
-# Nested route — shows or creates subusers for a specific distributor
-# Example: /api/v1/distributors/1/subusers/
-subuser_router = routers.NestedSimpleRouter(router, r'distributors', lookup='distributor')
-subuser_router.register(r'subusers', DistributorSubUserViewSet, basename='distributor-subusers')
+
+# -------------------------------------------------------------------
+# 🔵 NESTED ROUTES FOR SUBUSERS
+# -------------------------------------------------------------------
+# A subuser belongs to a specific distributor
+# Final Endpoints:
+#   GET  /api/v1/distributors/<id>/subusers/
+#   POST /api/v1/distributors/<id>/subusers/
+subuser_router = nested_routers.NestedSimpleRouter(
+    router, r'distributors', lookup='distributor'
+)
+
+subuser_router.register(
+    r'subusers',
+    DistributorSubUserViewSet,
+    basename='distributor-subusers'
+)
 
 
-# 📜 Custom URLs (not part of router)
+# -------------------------------------------------------------------
+# 🔵 CUSTOM ROUTES (NOT USING ROUTERS)
+# -------------------------------------------------------------------
 urlpatterns = [
-    # 📱 Distributor OTP Request
-    # Step 1: Distributor enters email or mobile → system sends OTP
-    # Method: POST
-    # Example: /api/v1/distributor/request-otp/
-    path('distributor/send-otp/', DistributorSendOTPView.as_view(), name='distributor_request_otp'),
 
-    # ✅ Verify OTP and Login
-    # Step 2: Distributor enters OTP → system verifies and returns JWT tokens
-    # Method: POST
-    # Example: /api/v1/distributor/verify-otp/
-    path('distributor/verify-otp/', DistributorVerifyOTPView.as_view(), name='distributor_verify_otp'),
+    # 📱 SEND OTP TO DISTRIBUTOR
+    # Endpoint: POST /api/v1/distributor/send-otp/
+    path(
+        'distributor/send-otp/',
+        DistributorSendOTPView.as_view(),
+        name='distributor_request_otp'
+    ),
 
-    # 👤 Fetch Distributor Profile
-    # Used to get the logged-in distributor’s own info (via access token)
-    # Method: GET
-    # Example: /api/v1/distributor/me/
-    path('distributor/me/', DistributorMeView.as_view(), name='distributor_me'),
+    # 🔐 VERIFY OTP (Distributor Login)
+    # Endpoint: POST /api/v1/distributor/verify-otp/
+    path(
+        'distributor/verify-otp/',
+        DistributorVerifyOTPView.as_view(),
+        name='distributor_verify_otp'
+    ),
 
-    # 🔐 Subuser Login
-    # Allows a subuser to log in using username/password or OTP (based on your logic)
-    # Method: POST
-    # Example: /api/v1/subuser/login/
-    path('subuser/login/', SubUserLoginView.as_view(), name='subuser_login'),
+    # 👤 Get logged-in Distributor Profile
+    # Endpoint: GET /api/v1/distributor/me/
+    path(
+        'distributor/me/',
+        DistributorMeView.as_view(),
+        name='distributor_me'
+    ),
 
-    # 🧭 Include all router-based endpoints (products, brands, etc.)
-    path('', include(router.urls)),
-    path('', include(subuser_router.urls)),
+    # 🔐 SUBUSER LOGIN (DIRECT LOGIN API)
+    # FINAL ENDPOINT:
+    #     POST /api/v1/subuser/login/
+    path(
+        'subuser/login/',
+        SubUserLoginView.as_view(),
+        name='subuser_login'
+    ),
+
+    # -------------------------------------------------------------------
+    # 🔗 INCLUDE ALL ROUTER URLS
+    # -------------------------------------------------------------------
+    path('', include(router.urls)),          # Adds: products, brands, distributors, patterns
+    path('', include(subuser_router.urls)),  # Adds: distributors/<id>/subusers/
+
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

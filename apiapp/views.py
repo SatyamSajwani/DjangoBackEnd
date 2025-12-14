@@ -2,7 +2,6 @@
 from datetime import timedelta
 from django.forms import ValidationError
 from django.shortcuts import get_object_or_404
-import requests
 from rest_framework import viewsets, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -203,7 +202,7 @@ class DistributorVerifyOTPView(APIView):
             return Response({"error": "Invalid email or OTP"}, status=status.HTTP_404_NOT_FOUND)
 
         # Check OTP match
-        if distributor.otp != otp:
+        if distributor.otp.strip() != str(otp).strip():
             return Response({"error": "Invalid OTP"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Check OTP expiry (5 min)
@@ -223,25 +222,28 @@ class DistributorVerifyOTPView(APIView):
 # -------------------------------------------------------------------
 # 🔹 Distributor profile management (/me)
 # -------------------------------------------------------------------
-
+# this is not working because  ill not pass the access token properly and refresh token for now this is pospond
 class DistributorMeView(APIView):
-    authentication_classes=[JWTAuthentication]
-    permission_classes=[IsAuthenticated]
-    
-    def get(self,request):
-        token=request.auth
-        if not token or token.get('user_type')!='distributor':
-            return Response({"error":"Sorry you are Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
-        distributor=get_object_or_404(CreateDistributor,Company_id=token['user_id'])
-        data=DistributorSerializer(distributor, context={'request': request}).data
-        return Response(data)
-    
-    def patch(self, request):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
         token = request.auth
+
         if not token or token.get('user_type') != 'distributor':
             return Response({"error": "Sorry you are Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
 
-        distributor = get_object_or_404(CreateDistributor, Company_id=token['user_id'])
+        distributor = get_object_or_404(CreateDistributor, id=token['user_id'])
+        data = DistributorSerializer(distributor, context={'request': request}).data
+        return Response(data)
+
+    def patch(self, request):
+        token = request.auth
+
+        if not token or token.get('user_type') != 'distributor':
+            return Response({"error": "Sorry you are Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        distributor = get_object_or_404(CreateDistributor, id=token['user_id'])
         serializer = DistributorSerializer(distributor, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             serializer.save()
@@ -249,33 +251,42 @@ class DistributorMeView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+
 # ===============================
 # SubUser Login (Email + Password)
 # ===============================
 class SubUserLoginView(APIView):
     def post(self, request):
-        email = request.data.get("Email")
+        email = request.data.get("email")
         password = request.data.get("password")
 
+        # Validate fields
         if not email or not password:
             return Response({"error": "Email and password are required"}, status=400)
 
+        # Verify user exists
         try:
             user = CreateSubUser.objects.get(Email=email)
         except CreateSubUser.DoesNotExist:
             return Response({"error": "Invalid Email"}, status=404)
 
+        # Check password ONLY
         if user.check_password(password):
-            tokens = get_tokens_for_identity(user.id, "subuser", distributor_id=user.distributor.Company_id if user.distributor else None)
-            
+            tokens = get_tokens_for_identity(
+                identity_id=user.id,
+                identity_type="subuser",
+                distributor_id=user.distributor.id if user.distributor else None
+            )
+
             return Response({
                 "message": "Login successful",
                 "Shop_Name": user.Shop_Name,
                 "Email": user.Email,
                 "tokens": tokens
             }, status=200)
-        else:
-            return Response({"error": "Incorrect password"}, status=400)
+
+        # Wrong password
+        return Response({"error": "Incorrect password"}, status=400)
 
 
 

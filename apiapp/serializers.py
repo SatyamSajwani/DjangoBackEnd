@@ -43,14 +43,46 @@ class SubuserSerializer(serializers.ModelSerializer):
 
 
 class PatternSerializer(serializers.ModelSerializer):
+    discounted_price = serializers.SerializerMethodField()
+
     class Meta:
         model = TyrePattern
-        fields = ['id', 'name', 'price', 'stock', 'image', 'brand']
+        fields = ['id', 'name', 'price', 'discounted_price', 'stock', 'image', 'brand']
+
+    def get_discounted_price(self, obj):
+        request = self.context.get('request')
+
+        if not request:
+            return obj.price
+
+        token = request.auth
+        if not token:
+            return obj.price
+
+        # Only apply discount for subusers
+        if token.get('user_type') == "subuser":
+            try:
+                subuser = CreateSubUser.objects.get(Subuser_id=token['user_id'])
+                discount = subuser.discount_percantage
+                base = obj.price
+                final_price = base - (base * discount / 100)
+                return round(final_price, 2)
+            except CreateSubUser.DoesNotExist:
+                return obj.price
+
+        # Distributor → no discount
+        return obj.price
 
 class TyreSerializer(serializers.ModelSerializer):
-    patterns = PatternSerializer(many=True, read_only=True)
+    patterns = serializers.SerializerMethodField()
 
     class Meta:
         model = TyreModel
         fields = ['id', 'width', 'ratio', 'rim', 'patterns']
+
+    def get_patterns(self, obj):
+        request = self.context.get('request')
+        serializer = PatternSerializer(obj.patterns.all(), many=True, context={'request': request})
+        return serializer.data
+
         

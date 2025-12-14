@@ -80,7 +80,7 @@ class CreateDistributor(models.Model):
 
 # sub user model
 class CreateSubUser(models.Model):
-    Subuser_id = models.AutoField(primary_key=True)    
+    id = models.AutoField(primary_key=True)    
     Shop_Name = models.CharField(max_length=50, unique=True, null=True, blank=True)
     Email = models.EmailField(max_length=50, unique=True, null=True, blank=True)
     password = models.CharField(max_length=128)
