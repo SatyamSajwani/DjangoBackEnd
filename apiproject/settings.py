@@ -27,7 +27,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 # SECRET_KEY = 'django-insecure-mblw@+an%m2_x#)hlx7eu_*cpi@fxelj-5x2meq^$_*2c79p4y'
 
-SECRET_KEY = os.environ.get('SECRET_KEY', 'unsafe-secret-key')
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-mblw@+an%m2_x#)hlx7eu_*cpi@fxelj-5x2meq^$_*2c79p4y')
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -177,8 +177,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # EMAIL_HOST = 'smtp.gmail.com'
 # EMAIL_PORT = 587
 # EMAIL_USE_TLS = True
-# EMAIL_HOST_USER = os.environ.get('satyamsajwani7069@gmail.com')
-# EMAIL_HOST_PASSWORD = os.environ.get('vcog pphb nvuh bahk')
 # DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # Gmail SMTP config
@@ -187,8 +185,8 @@ EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+EMAIL_HOST_USER = os.environ.get('satyamsajwani7069@gmail.com')
+EMAIL_HOST_PASSWORD = os.environ.get('yifd pmhe xjkf svju')
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 
