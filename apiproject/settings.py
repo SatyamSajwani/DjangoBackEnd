@@ -111,14 +111,25 @@ WSGI_APPLICATION = 'apiproject.wsgi.application'
 #     }
 # }
 
+DATABASE_URL = os.environ.get("postgresql://django_postgres_db_6xmt_user:Wzf0jKMlp5JneRHFPfrkvOuzqATwNVUn@dpg-d4vrto9r0fns739rqd40-a/django_postgres_db_6xmt")
 
-DATABASES = {
-    'default': dj_database_url.config(
-        default=os.environ.get("postgresql://django_postgres_db_6xmt_user:Wzf0jKMlp5JneRHFPfrkvOuzqATwNVUn@dpg-d4vrto9r0fns739rqd40-a/django_postgres_db_6xmt"),
-        conn_max_age=600,
-        ssl_require=True,
-    )
-}
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=True,
+        )
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+
+
 
 
 CSRF_TRUSTED_ORIGINS = [
