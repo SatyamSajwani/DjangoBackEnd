@@ -21,6 +21,6 @@ from .views import home_page
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('home/',home_page),
-    path('https://django-web-pkfi.onrender.com/api/v1/',include('apiapp.urls'))
+    path('api/v1/',include('apiapp.urls'))
     
 ]
