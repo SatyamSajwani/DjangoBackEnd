@@ -152,17 +152,31 @@ class CreateTyreModelViewSet(viewsets.ModelViewSet):
 #   "email": "distributor@example.com"
 # }
 
+from django.core.mail import EmailMessage
+from django.utils import timezone
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework import status
+import random
+
+
 class DistributorSendOTPView(APIView):        
     def post(self, request):
         email = str(request.data.get("email")).strip()
 
         if not email:
-            return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Email is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             distributor = CreateDistributor.objects.get(email=email)
         except CreateDistributor.DoesNotExist:
-            return Response({"error": "Distributor not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Distributor not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
         # Generate OTP
         otp = str(random.randint(100000, 999999))
@@ -172,20 +186,33 @@ class DistributorSendOTPView(APIView):
         distributor.otp_created_at = timezone.now()
         distributor.save()
 
-        # Send OTP Email
-        subject = "Your Login OTP"
-        message = f"Your OTP is: {otp}\n\nIt is valid for 5 minutes."
-        print("your otp was ",{otp})
+        # Send OTP Email (SAFE)
+        try:
+            subject = "Your Login OTP"
+            message = f"Your OTP is: {otp}\n\nIt is valid for 5 minutes."
 
-        email_msg = EmailMessage(
-            subject,
-            message,
-            to=[email]
+            email_msg = EmailMessage(
+                subject=subject,
+                body=message,
+                from_email=None,   # uses DEFAULT_FROM_EMAIL
+                to=[email],
+            )
+            email_msg.send(fail_silently=False)
+
+        except Exception as e:
+            return Response(
+                {
+                    "error": "Failed to send OTP email",
+                    "details": str(e)
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        return Response(
+            {"message": "OTP sent to your email"},
+            status=status.HTTP_200_OK
         )
-        email_msg.send()
-        
-
-        return Response({"message": "OTP sent to your email"}, status=status.HTTP_200_OK)        
+    
 
 
 class DistributorVerifyOTPView(APIView):
