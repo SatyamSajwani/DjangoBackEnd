@@ -52,26 +52,28 @@ class PatternSerializer(serializers.ModelSerializer):
     def get_discounted_price(self, obj):
         request = self.context.get('request')
 
-        if not request:
+        # No request / token → show base price
+        if not request or not request.auth:
             return obj.price
 
         token = request.auth
-        if not token:
-            return obj.price
+        discount = 0
 
-        # Only apply discount for subusers
+        # ✅ SubUser discount
         if token.get('user_type') == "subuser":
             try:
-                subuser = CreateSubUser.objects.get(Subuser_id=token['user_id'])
+                subuser = CreateSubUser.objects.get(id=token['user_id'])
                 discount = subuser.discount_percantage
-                base = obj.price
-                final_price = base - (base * discount / 100)
-                return round(final_price, 2)
             except CreateSubUser.DoesNotExist:
-                return obj.price
+                discount = 0
 
-        # Distributor → no discount
-        return obj.price
+        # ✅ Distributor → no discount (or add later if needed)
+        elif token.get('user_type') == "distributor":
+            discount = 0
+
+        final_price = obj.price - (obj.price * discount / 100)
+        return round(final_price, 2)
+
 
 class TyreSerializer(serializers.ModelSerializer):
     patterns = serializers.SerializerMethodField()
