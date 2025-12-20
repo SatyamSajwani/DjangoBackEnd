@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 import dj_database_url
 from dotenv import load_dotenv
-
+from rest_framework.permissions import IsAuthenticated
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -49,7 +49,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # Application definition
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'apiapp.authentication.CustomJWTAuthentication',
     ),
 }
 
@@ -111,8 +111,8 @@ WSGI_APPLICATION = 'apiproject.wsgi.application'
 #     }
 # }
 
-DATABASE_URL = os.environ.get("postgresql://django_postgres_db_6xmt_user:Wzf0jKMlp5JneRHFPfrkvOuzqATwNVUn@dpg-d4vrto9r0fns739rqd40-a/django_postgres_db_6xmt")
-
+# DATABASE_URL = os.environ.get("postgresql://django_postgres_db_6xmt_user:Wzf0jKMlp5JneRHFPfrkvOuzqATwNVUn@dpg-d4vrto9r0fns739rqd40-a/django_postgres_db_6xmt")
+DATABASE_URL= os.environ.get("DATABASE_URL")
 if DATABASE_URL:
     DATABASES = {
         'default': dj_database_url.config(
@@ -192,13 +192,18 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Gmail SMTP config
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.environ.get('satyamsajwani7069@gmail.com')
-EMAIL_HOST_PASSWORD = os.environ.get('yifd pmhe xjkf svju')
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
+EMAIL_HOST = os.environ.get("EMAIL_HOST")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 587))
+EMAIL_USE_TLS = True
+
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
+
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL")
+
+# EMAIL_HOST_USER = os.environ.get('satyamsajwani7069@gmail.com')
+# EMAIL_HOST_PASSWORD = os.environ.get('yifd pmhe xjkf svju')
 
 from datetime import timedelta
 
