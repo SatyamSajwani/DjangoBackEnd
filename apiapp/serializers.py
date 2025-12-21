@@ -56,19 +56,15 @@ class PatternSerializer(serializers.ModelSerializer):
         if not request or not request.auth:
             return obj.price
 
-        token = request.auth
+        user = request.user
         discount = 0
 
         # ✅ SubUser discount
-        if token.get('user_type') == "subuser":
-            try:
-                subuser = CreateSubUser.objects.get(id=token['user_id'])
-                discount = subuser.discount_percantage
-            except CreateSubUser.DoesNotExist:
-                discount = 0
-
+        if isinstance(user, CreateSubUser):
+            discount = user.discount_percantage or 0
+            
         # ✅ Distributor → no discount (or add later if needed)
-        elif token.get('user_type') == "distributor":
+        elif isinstance(user, CreateDistributor):
             discount = 0
 
         final_price = obj.price - (obj.price * discount / 100)
