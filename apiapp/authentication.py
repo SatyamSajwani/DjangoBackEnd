@@ -1,22 +1,29 @@
-from rest_framework.authentication import BaseAuthentication
+# apiapp/authentication.py
+
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.exceptions import AuthenticationFailed
-from rest_framework_simplejwt.tokens import AccessToken
+from apiapp.models import CreateDistributor, CreateSubUser
 
+class CustomJWTAuthentication(JWTAuthentication):
+    def get_user(self, validated_token):
+        user_id = validated_token.get("user_id")
+        user_type = validated_token.get("user_type")
 
+        if not user_id or not user_type:
+            raise AuthenticationFailed("Invalid token payload")
 
-class CustomJWTAuthentication(BaseAuthentication):
-    def authenticate(self, request):
-        auth_header = request.headers.get('Authorization')
+        # 🔹 Distributor login
+        if user_type == "distributor":
+            try:
+                return CreateDistributor.objects.get(id=user_id)
+            except CreateDistributor.DoesNotExist:
+                raise AuthenticationFailed("Distributor not found")
 
-        if not auth_header:
-            return None
+        # 🔹 Subuser login
+        elif user_type == "subuser":
+            try:
+                return CreateSubUser.objects.get(id=user_id)
+            except CreateSubUser.DoesNotExist:
+                raise AuthenticationFailed("Subuser not found")
 
-        try:
-            token_str = auth_header.split()[1]
-            token = AccessToken(token_str)
-        except Exception:
-            raise AuthenticationFailed("Invalid token")
-
-        # IMPORTANT: return (user, token)
-        # We don't use Django User → return None
-        return (None, token)
+        raise AuthenticationFailed("Invalid user type")
