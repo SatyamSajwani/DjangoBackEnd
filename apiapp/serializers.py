@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from apiapp.models import *
+from decimal import Decimal
 
 
 class BrandSerializer(serializers.ModelSerializer):
@@ -44,7 +45,6 @@ class SubuserSerializer(serializers.ModelSerializer):
 
 class PatternSerializer(serializers.ModelSerializer):
     discounted_price = serializers.SerializerMethodField()
-
     class Meta:
         model = TyrePattern
         fields = ['id', 'name', 'price', 'discounted_price', 'stock', 'image', 'brand']
@@ -53,22 +53,22 @@ class PatternSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
 
         # No request / token → show base price
-        if not request or not request.auth:
+        if not request or not hasattr(request, 'user'):
             return obj.price
 
         user = request.user
-        discount = 0
+        discount = Decimal("0")
 
-        # ✅ SubUser discount
+        # Subuser discount
         if isinstance(user, CreateSubUser):
-            discount = user.discount_percantage or 0
-            
-        # ✅ Distributor → no discount (or add later if needed)
-        elif isinstance(user, CreateDistributor):
-            discount = 0
+            discount = Decimal(str(user.discount_percantage or 0))
 
-        final_price = obj.price - (obj.price * discount / 100)
-        return round(final_price, 2)
+        # Distributor (no discount)
+        elif isinstance(user, CreateDistributor):
+            discount = Decimal("0")
+
+        price = Decimal(obj.price)
+        final_price = price - (price * discount / Decimal("100"))
 
 
 class TyreSerializer(serializers.ModelSerializer):
