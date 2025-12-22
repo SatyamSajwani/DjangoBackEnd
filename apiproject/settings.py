@@ -31,8 +31,8 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-mblw@+an%m2_x#)hlx7eu
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# DEBUG = True
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+DEBUG = True
+# DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 
 ALLOWED_HOSTS = [
@@ -47,11 +47,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 
 # Application definition
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'apiapp.authentication.CustomJWTAuthentication',
-    ),
-}
+
 
 INSTALLED_APPS = [
     'django.contrib.admin',

@@ -140,6 +140,7 @@ class TyrePatternViewSet(viewsets.ModelViewSet):
 class CreateTyreModelViewSet(viewsets.ModelViewSet):
     queryset = TyreModel.objects.all()
     serializer_class = TyreSerializer
+    permission_classes = [IsAuthenticated]   
 
 # ===============================##############+++++++++++++
 
@@ -160,7 +161,8 @@ from rest_framework import status
 import random
 
 
-class DistributorSendOTPView(APIView):        
+class DistributorSendOTPView(APIView):     
+    permission_classes=[AllowAny]   
     def post(self, request):
         email = str(request.data.get("email")).strip()
 
@@ -216,6 +218,7 @@ class DistributorSendOTPView(APIView):
 
 
 class DistributorVerifyOTPView(APIView):
+    permission_classes=[AllowAny]   
     def post(self, request):
         email = request.data.get("email")
         otp = request.data.get("otp")
@@ -283,22 +286,31 @@ class DistributorMeView(APIView):
 # SubUser Login (Email + Password)
 # ===============================
 class SubUserLoginView(APIView):
+    permission_classes = [AllowAny]
+
     def post(self, request):
+
         email = request.data.get("email")
         password = request.data.get("password")
 
-        # Validate fields
+
         if not email or not password:
             return Response({"error": "Email and password are required"}, status=400)
 
-        # Verify user exists
         try:
             user = CreateSubUser.objects.get(Email=email)
+
         except CreateSubUser.DoesNotExist:
+
             return Response({"error": "Invalid Email"}, status=404)
 
-        # Check password ONLY
-        if user.check_password(password):
+        try:
+            is_valid = user.check_password(password)
+
+        except Exception as e:
+            raise e
+
+        if is_valid:
             tokens = get_tokens_for_identity(
                 identity_id=user.id,
                 identity_type="subuser",
@@ -307,12 +319,12 @@ class SubUserLoginView(APIView):
 
             return Response({
                 "message": "Login successful",
-                "Shop_Name": user.Shop_Name,
-                "Email": user.Email,
-                "tokens": tokens
+                "username": user.Shop_Name,
+                "email": user.Email,
+                "tokens": tokens,
+                "distributor_id": user.distributor.id if user.distributor else None
             }, status=200)
 
-        # Wrong password
         return Response({"error": "Incorrect password"}, status=400)
 
 

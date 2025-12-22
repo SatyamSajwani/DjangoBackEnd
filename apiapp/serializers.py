@@ -69,6 +69,7 @@ class PatternSerializer(serializers.ModelSerializer):
 
         price = Decimal(obj.price)
         final_price = price - (price * discount / Decimal("100"))
+        return round(final_price, 2)
 
 
 class TyreSerializer(serializers.ModelSerializer):
@@ -82,5 +83,3 @@ class TyreSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         serializer = PatternSerializer(obj.patterns.all(), many=True, context={'request': request})
         return serializer.data
-
-        
